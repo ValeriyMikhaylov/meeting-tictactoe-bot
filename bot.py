@@ -1,5 +1,7 @@
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from battleship import Game as SeaGame
+
 
 # ВСТАВЬ СВОЙ ТОКЕН
 import os
@@ -9,6 +11,8 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 # chat_id -> state
 games = {}
+sea_games = {}  # chat_id -> SeaGame
+sea_players = {}  # chat_id -> list[user_id]
 
 # Сессии игр и другая глобальная логика
 game_sessions = {}  # как у тебя сейчас
@@ -69,7 +73,9 @@ def start(message):
         "Привет! Бот крестики-нолики для совещаний.\n\n"
         "/newgame — создать игру в этом чате\n"
         "/join — присоединиться (первый X, второй O)\n"
-        "/stats — твоя статистика и топ-3 по победам",
+        "/stats — твоя статистика и топ-3 по победам\n"
+        "/newsea — создать игру Морской бой\n"
+        "/joinsea — присоединиться к Морскому бою"
     )
 
     
@@ -132,6 +138,21 @@ def new_game(message):
         "Второй /join — будет O.",
     )
 
+@bot.message_handler(commands=["newsea"])
+def new_sea_game(message):
+    chat_id = message.chat.id
+
+    if chat_id in sea_games:
+        bot.reply_to(message, "Игра морской бой уже создана в этом чате.")
+        return
+
+    sea_players[chat_id] = []
+    bot.reply_to(
+        message,
+        "Новая игра Морской бой создана!\n"
+        "Первый, кто напишет /joinsea, станет игроком A.\n"
+        "Второй /joinsea — игроком B.",
+    )
 
 @bot.message_handler(commands=["join"])
 def join(message):
@@ -171,6 +192,42 @@ def join(message):
             reply_markup=build_keyboard(game["board"])
         )
         game["message_id"] = msg.message_id
+
+@bot.message_handler(commands=["joinsea"])
+def join_sea_game(message):
+    chat_id = message.chat.id
+    user = message.from_user
+
+    if chat_id not in sea_players:
+        bot.reply_to(message, "Сначала создайте игру командой /newsea.")
+        return
+
+    players = sea_players[chat_id]
+
+    if user.id in players:
+        bot.reply_to(message, "Ты уже участвуешь в этой игре.")
+        return
+
+    if len(players) >= 2:
+        bot.reply_to(message, "В этой игре уже два игрока.")
+        return
+
+    players.append(user.id)
+    bot.reply_to(message, f"{user.first_name} присоединился к Морскому бою.")
+
+    # когда двое набрались — создаём игру и авторасставляем флот
+    if len(players) == 2:
+        player_a_id, player_b_id = players
+        game = SeaGame(player_a_id, player_b_id)
+        game.auto_place_fleet_for(player_a_id)
+        game.auto_place_fleet_for(player_b_id)
+        sea_games[chat_id] = game
+
+        bot.send_message(
+            chat_id,
+            "Флот для обоих игроков расставлен автоматически.\n"
+            "Игрок A ходит первым. Команда для выстрела будет позже (например, /shot A5).",
+        )
 
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("move:"))
