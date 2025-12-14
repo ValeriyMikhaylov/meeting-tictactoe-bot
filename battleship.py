@@ -173,13 +173,13 @@ class Game:
         board_a = self.boards[self.player_a_id]
         board_b = self.boards[self.player_b_id]
         return board_a.all_ships_sunk() or board_b.all_ships_sunk()      
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # простой тест авторасстановки и рендера поля
     # print("START BATTLESHIP TEST")
     # game = Game(1, 2)
     # game.auto_place_fleet_for(1)
     # print(game.boards[1].render_for_owner())
-    pass
+    # pass
 
 
    
