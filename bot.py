@@ -421,14 +421,29 @@ def handle_move(call):
 def main():
     logger.info("Bot starting...")
     print(">>> Bot started")
+    
+    # Принудительно закрываем все предыдущие сессии
+    try:
+        import requests
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/close", timeout=5)
+        logger.info("Closed previous bot sessions")
+        time.sleep(2)  # Даем время закрыться
+    except:
+        pass  # Игнорируем ошибки если нет соединения
+    
     while True:
         try:
-            bot.infinity_polling(timeout=60, long_polling_timeout=60)
+            logger.info("Starting polling...")
+            bot.infinity_polling(
+                timeout=60, 
+                long_polling_timeout=60,
+                skip_pending=True  # Пропустить накопившиеся сообщения
+            )
         except requests.exceptions.ConnectionError:
-            print("Connection error, retrying in 5 seconds...")
+            logger.error("Connection error, retrying in 5 seconds...")
             time.sleep(5)
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
             time.sleep(5)
 
 if __name__ == "__main__":
