@@ -8,6 +8,18 @@ import os
 import logging
 import sys
 
+# ... после импортов ...
+
+# Проверяем, не запущен ли уже бот
+try:
+    import requests
+    # Быстрая проверка
+    test_response = requests.get(f"https://api.telegram.org/bot{TOKEN}/getMe", timeout=5)
+    if test_response.status_code == 200:
+        print("✓ Telegram API доступен")
+except Exception as e:
+    print(f"✗ Ошибка доступа к Telegram API: {e}")
+    
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -425,26 +437,58 @@ def main():
     # Принудительно закрываем все предыдущие сессии
     try:
         import requests
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/close", timeout=5)
-        logger.info("Closed previous bot sessions")
-        time.sleep(2)  # Даем время закрыться
-    except:
-        pass  # Игнорируем ошибки если нет соединения
+        response = requests.post(f"https://api.telegram.org/bot{TOKEN}/close", timeout=5)
+        logger.info(f"Closed previous bot sessions: {response.status_code}")
+        time.sleep(3)  # Даем время закрыться
+    except Exception as e:
+        logger.info(f"No previous sessions or error: {e}")
     
-    while True:
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
-            logger.info("Starting polling...")
+            logger.info(f"Starting polling (attempt {retry_count + 1}/{max_retries})...")
             bot.infinity_polling(
                 timeout=60, 
                 long_polling_timeout=60,
-                skip_pending=True  # Пропустить накопившиеся сообщения
+                skip_pending=True,  # Пропустить старые сообщения
+                restart_on_change=False  # Не перезапускать при изменении
             )
-        except requests.exceptions.ConnectionError:
-            logger.error("Connection error, retrying in 5 seconds...")
-            time.sleep(5)
+            
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            time.sleep(5)
+            error_str = str(e)
+            
+            # Критическая ошибка - другой бот уже запущен
+            if "409" in error_str or "Conflict" in error_str:
+                logger.error(f"CRITICAL: Another bot instance is running! Error: {error_str}")
+                print("CRITICAL: Another bot instance detected. This bot will exit.")
+                
+                # Попробуем закрыть сессии конкурента
+                try:
+                    requests.post(f"https://api.telegram.org/bot{TOKEN}/close", timeout=5)
+                    time.sleep(2)
+                except:
+                    pass
+                    
+                # Выходим полностью
+                return
+                
+            # Обычные сетевые ошибки
+            elif "Connection" in error_str or "reset" in error_str or "timeout" in error_str:
+                logger.warning(f"Network error: {e}, retrying in 10 seconds...")
+                time.sleep(10)
+                retry_count += 1
+                continue
+                
+            else:
+                logger.error(f"Unexpected error: {e}")
+                time.sleep(5)
+                retry_count += 1
+                continue
+    
+    logger.error(f"Failed after {max_retries} attempts. Exiting.")
+    print(">>> Bot stopped after multiple failures")
 
 if __name__ == "__main__":
     main()
