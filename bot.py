@@ -5,6 +5,17 @@ import time
 import requests
 import os
 
+import logging
+import sys
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
+
 print(">>> bot script import OK")
 
 # ВСТАВЬ СВОЙ ТОКЕН
@@ -408,7 +419,8 @@ def handle_move(call):
     bot.answer_callback_query(call.id)
 
 def main():
-    print("Bot started")
+    logger.info("Bot starting...")
+    print(">>> Bot started")
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=60)
