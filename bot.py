@@ -1,6 +1,7 @@
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from battleship import Game as SeaGame
+print(">>> bot script import OK")
 
 
 # ВСТАВЬ СВОЙ ТОКЕН
@@ -68,6 +69,7 @@ def next_symbol(sym):
 
 @bot.message_handler(commands=["start", "help"])
 def start(message):
+    print(">>> /start from", message.from_user.id)
     bot.reply_to(
         message,
         "Привет! Бот крестики-нолики для совещаний.\n\n"
