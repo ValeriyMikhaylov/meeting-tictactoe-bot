@@ -108,7 +108,7 @@ def register_handlers(bot):
             target_board = game.boards[target_id]
         
         # Делаем выстрел
-        result = target_board.receive_shot(row, col)
+        result = target_board.receive_shot((row, col))
         
         # Формируем ответ
         response = f"{coord_text}: "
