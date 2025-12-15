@@ -179,6 +179,8 @@ class Game:
         self.phase: str = "placing"  # "placing" или "battle"
         # можно хранить, сколько кораблей уже расставил каждый игрок
         self.placed_counts: Dict[int, int] = {player_a_id: 0, player_b_id: 0}
+        self.chat_id: int | None = None
+        self.message_id: int | None = None
 
     def auto_place_fleet_for(self, player_id: int) -> None:
         """Случайно расставляет весь флот игрока на его доске."""
