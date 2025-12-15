@@ -5,9 +5,12 @@ def empty_board():
 
 def board_text(board):
     lines = []
-    for row in board:
-        lines.append(' | '.join(cell if cell != ' ' else ' ' for cell in row))
-    return '---------\n'.join(lines)
+    for i, row in enumerate(board):
+        cells = ' | '.join(cell if cell != ' ' else '·' for cell in row)
+        lines.append(cells)
+        if i < 2:
+            lines.append('---------')
+    return '\n'.join(lines)
 
 def check_winner(board):
     lines = []

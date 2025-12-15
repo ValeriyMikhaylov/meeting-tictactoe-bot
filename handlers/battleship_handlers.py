@@ -18,7 +18,7 @@ def register_handlers(bot):
         sea_players[chat_id] = []
         bot.reply_to(message, "Морской бой создан! 🚢\n"
                               "/joinsea - присоединиться (первый A, второй B)\n"
-                              "/shot ords> - выстрел, например /shot A5.")
+                              "/shot (Координаты от A1 до J10) - выстрел, например /shot A5.")
 
     @bot.message_handler(commands=['joinsea'])
     def join_sea_game_message(message):
