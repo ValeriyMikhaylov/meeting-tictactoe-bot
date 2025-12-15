@@ -94,46 +94,49 @@ class Board:
     def all_ships_sunk(self) -> bool:
         return all(ship.is_sunk() for ship in self.ships)
     
-    def render_for_owner(self) -> str:
-        """Поле для самого игрока: видно свои корабли и выстрелы противника."""
+    def renderForOwner(self) -> str:
+        """Показывает доску владельцу - видны корабли и выстрелы"""
         lines = []
-        # шапка: номера столбцов 1..10
-        header = "   " + " ".join(str(c + 1) for c in range(self.SIZE))
+        header = " ".join(str(c) for c in range(self.SIZE))
         lines.append(header)
-
         for r in range(self.SIZE):
-            row_cells = []
-            for c in range(self.SIZE):
-                ch = self.grid[r][c]
-                if ch == " ":
-                    ch = "·"   # пустая клетка, куда ещё не стреляли
-                row_cells.append(ch)
-            # буква строки A..J
-            lines.append(f"{chr(ord('A') + r)}  " + " ".join(row_cells))
-
-        return "\n".join(lines)    
-
-    def render_for_opponent(self) -> str:
-        """
-        Поле для соперника: показываем только выстрелы по мне.
-        Корабли, куда не попали, скрыты.
-        """
-        lines = []
-        header = "   " + " ".join(str(c + 1) for c in range(self.SIZE))
-        lines.append(header)
-
-        for r in range(self.SIZE):
-            row_cells = []
+            rowCells = []
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
                 if ch == "O":
-                    ch = "·"   # свои корабли не показываем
-                if ch == " ":
-                    ch = "·"
-                row_cells.append(ch)
-            lines.append(f"{chr(ord('A') + r)}  " + " ".join(row_cells))
-
+                    ch = "🛢"  # Корабль видим владельцу
+                elif ch == "X":
+                    ch = "❌"  # Попадание видим
+                elif ch == "~":
+                    ch = "💧"  # Промах видим
+                else:
+                    ch = "⬜"  # Пустая клетка
+                rowCells.append(ch)
+            lines.append(f"{chr(ord('A') + r)} {' '.join(rowCells)}")
         return "\n".join(lines)
+   
+
+    def renderForOpponent(self) -> str:
+        """Показывает доску сопернику - скрывает корабли"""
+        lines = []
+        header = " ".join(str(c) for c in range(self.SIZE))
+        lines.append(header)
+        for r in range(self.SIZE):
+            rowCells = []
+            for c in range(self.SIZE):
+                ch = self.grid[r][c]
+                if ch == "O":
+                    ch = "⬜"  # Скрываем корабли от противника
+                elif ch == "X":
+                    ch = "❌"  # Видим попадания
+                elif ch == "~":
+                    ch = "💧"  # Видим промахи
+                else:
+                    ch = "⬜"  # Пустая клетка
+                rowCells.append(ch)
+            lines.append(f"{chr(ord('A') + r)} {' '.join(rowCells)}")
+        return "\n".join(lines)
+
 
     
 
