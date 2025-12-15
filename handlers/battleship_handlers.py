@@ -150,17 +150,18 @@ def send_boards(bot, game):
     bot.send_message(
         game.player_a_id,
         f"**Твоё поле (A):**\n"
-        f"``````\n\n"
+        f"```\n{board_a.renderForOwner()}\n```\n\n"
         f"**Поле противника (B):**\n"
-        f"``````"
+        f"```\n{board_b.renderForOpponent()}\n```"
     )
 
     # Игроку B: его поле + поле противника A
     bot.send_message(
         game.player_b_id,
         f"**Твоё поле (B):**\n"
-        f"``````\n\n"
+        f"```\n{board_b.renderForOwner()}\n```\n\n"
         f"**Поле противника (A):**\n"
-        f"``````"
+        f"```\n{board_a.renderForOpponent()}\n```"
     )
+
 
