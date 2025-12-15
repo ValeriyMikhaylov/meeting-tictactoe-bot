@@ -80,16 +80,30 @@ class Board:
             return "miss"
 
         if self.grid[r][c] == "O":
+            # попали в корабль
             self.grid[r][c] = "X"
             for ship in self.ships:
                 if coord in ship.cells:
                     ship.hits.add(coord)
-                    return "sunk" if ship.is_sunk() else "hit"
+                    if ship.is_sunk():
+                        # корабль утонул — обводим его точками
+                        for sr, sc in ship.cells:
+                            for nr in range(sr - 1, sr + 2):
+                                for nc in range(sc - 1, sc + 2):
+                                    if not self.in_bounds(nr, nc):
+                                        continue
+                                    if self.grid[nr][nc] == " ":
+                                        self.grid[nr][nc] = "·"
+                        return "sunk"
+                    else:
+                        return "hit"
         else:
+            # мимо по пустой клетке
             self.grid[r][c] = "·"
             return "miss"
 
         return "miss"
+
 
     def all_ships_sunk(self) -> bool:
         return all(ship.is_sunk() for ship in self.ships)

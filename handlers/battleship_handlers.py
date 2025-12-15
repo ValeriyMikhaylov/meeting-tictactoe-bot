@@ -136,21 +136,24 @@ def register_handlers(bot):
         if target_board.all_ships_sunk():
             winner_name = "A" if user_id == game.player_a_id else "B"
             bot.send_message(chat_id, f"Игрок {winner_name} выиграл! 🏆")
-            
             # Удаляем игру
             sea_games.pop(chat_id, None)
             sea_players.pop(chat_id, None)
             return
-        
-        # Иначе переходит ход
-        game.switch_turn()
-        
-        # Отправляем обновлённые доски обоим игрокам
+
+        # Обновляем доски для обоих игроков
         send_boards(bot, game)
-        
-        # Определяем следующего игрока
-        next_player = "A" if game.turn == game.player_a_id else "B"
-        bot.send_message(chat_id, f"Ход игрока {next_player}!")
+
+        # Если был промах — передаём ход, если попадание/потоплен, ход остаётся
+        if result == 'miss':
+            game.switch_turn()
+            next_player = "A" if game.turn == game.player_a_id else "B"
+            bot.send_message(chat_id, f"Ход игрока {next_player}!")
+        else:
+            # попал или потопил — просто сообщаем, что ходит тот же игрок
+            current_player = "A" if game.turn == game.player_a_id else "B"
+            bot.send_message(chat_id, f"Игрок {current_player} ходит ещё раз!")
+
         
     @bot.message_handler(commands=['seahint'])
     def sea_hint_handler(message):
@@ -220,6 +223,34 @@ def register_handlers(bot):
 
         # Обновляем поля для обоих игроков
         send_boards(bot, game)
+
+    @bot.message_handler(commands=['seagiveup'])
+    def sea_giveup_handler(message):
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+
+        if chat_id not in sea_games:
+            bot.reply_to(message, "Нет активной игры. Создай /newsea.")
+            return
+
+        game = sea_games[chat_id]
+
+        if user_id not in [game.player_a_id, game.player_b_id]:
+            bot.reply_to(message, "Ты не в этой игре!")
+            return
+
+        # Определяем, кто победил
+        winner_name = "A" if user_id != game.player_a_id else "B"
+
+        bot.send_message(
+            chat_id,
+            f"Игрок {'A' if user_id == game.player_a_id else 'B'} сдался. "
+            f"Победил игрок {winner_name}! 🏆"
+        )
+
+        # Удаляем игру
+        sea_games.pop(chat_id, None)
+        sea_players.pop(chat_id, None)
 
 
 
