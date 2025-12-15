@@ -97,45 +97,54 @@ class Board:
     def renderForOwner(self) -> str:
         """Показывает доску владельцу - видны корабли и выстрелы"""
         lines = []
-        header = " ".join(str(c) for c in range(self.SIZE))
+
+        # Шапка: числа 1–10 с отступом под букву
+        header = "  " + " ".join(str(c) for c in range(1, self.SIZE + 1))
         lines.append(header)
+
         for r in range(self.SIZE):
-            rowCells = []
+            row_cells = []
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
                 if ch == "O":
-                    ch = "🛢"  # Корабль видим владельцу
+                    ch = "🛢"  # корабль
                 elif ch == "X":
-                    ch = "❌"  # Попадание видим
-                elif ch == "·":
-                    ch = "💧"  # Промах видим
+                    ch = "❌"  # попадание
+                elif ch == "·" or ch == ".":  # промах (учитываем оба варианта)
+                    ch = "💧"
                 else:
-                    ch = "⬜"  # Пустая клетка
-                rowCells.append(ch)
-            lines.append(f"{chr(ord('A') + r)} {' '.join(rowCells)}")
+                    ch = "⬜"  # пусто
+                row_cells.append(ch)
+
+            # Буква строки + пробел + клетки
+            lines.append(f"{chr(ord('A') + r)} " + " ".join(row_cells))
+
         return "\n".join(lines)
    
 
     def renderForOpponent(self) -> str:
         """Показывает доску сопернику - скрывает корабли"""
         lines = []
-        header = " ".join(str(c) for c in range(self.SIZE))
+
+        header = "  " + " ".join(str(c) for c in range(1, self.SIZE + 1))
         lines.append(header)
+
         for r in range(self.SIZE):
-            rowCells = []
+            row_cells = []
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
-                if ch == "O":
-                    ch = "⬜"  # Скрываем корабли от противника
-                elif ch == "X":
-                    ch = "❌"  # Видим попадания
-                elif ch == "·":
-                    ch = "💧"  # Видим промахи
+                if ch == "X":
+                    ch = "❌"
+                elif ch == "·" or ch == ".":
+                    ch = "💧"
                 else:
-                    ch = "⬜"  # Пустая клетка
-                rowCells.append(ch)
-            lines.append(f"{chr(ord('A') + r)} {' '.join(rowCells)}")
+                    ch = "⬜"
+                row_cells.append(ch)
+
+            lines.append(f"{chr(ord('A') + r)} " + " ".join(row_cells))
+
         return "\n".join(lines)
+
 
 
     

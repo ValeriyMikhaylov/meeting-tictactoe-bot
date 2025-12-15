@@ -41,6 +41,11 @@ def register_handlers(bot):
         players.append(user.id)
         bot.reply_to(message, f"{user.first_name}, ты присоединился! 🎮")
         
+        bot.send_message(
+    user.id,
+    "Привет! Чтобы получать своё поле в личку, нажми кнопку «Start» у бота в этом чате."
+)
+        
         # Если оба играют, начинаем игру
         if len(players) >= 2:
             player_a_id, player_b_id = players
