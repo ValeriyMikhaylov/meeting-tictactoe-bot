@@ -1,6 +1,8 @@
 # handlers/common_handlers.py
 
 from handlers.tictactoe_handlers import stats as tictactoe_stats
+from db import get_balance, change_balance
+
 
 def register_handlers(bot):
     """Регистрирует общие хэндлеры"""
@@ -17,6 +19,7 @@ def register_handlers(bot):
                               "/newsea - создать игру\n"
                               "/joinsea - присоединиться\n"
                               "/shot A5 - выстрел\n\n"
+                              "💎 /balance - показать твой баланс алмазов\n"
                               "📊 /stats - твоя статистика")
 
     @bot.message_handler(commands=['stats'])
@@ -42,3 +45,38 @@ def register_handlers(bot):
             text += "\nПока нет побед, табличка лидеров будет позже."
         
         bot.reply_to(message, text)
+
+    @bot.message_handler(commands=['balance'])
+    def balance_handler(message):
+        user_id = message.from_user.id
+        diamonds = get_balance(user_id)
+        bot.reply_to(message, f"У тебя {diamonds} алмазов 💎")
+        
+    ADMIN_ID = 1989685811  # сюда подставь своё число
+
+    @bot.message_handler(commands=['add_diamonds'])
+    def add_diamonds_handler(message):
+        user_id = message.from_user.id
+        if user_id != ADMIN_ID:
+            bot.reply_to(message, "Эта команда доступна только администратору.")
+            return
+
+        try:
+            _, target_id_str, amount_str = message.text.split(maxsplit=2)
+            target_id = int(target_id_str)
+            amount = int(amount_str)
+        except (ValueError, IndexError):
+            bot.reply_to(
+                message,
+                "Формат: /add_diamonds <user_id> <amount>\n"
+                "Например: /add_diamonds 123456789 100",
+            )
+            return
+
+        new_balance = change_balance(target_id, amount)
+        bot.reply_to(
+            message,
+            f"Пользователю {target_id} начислено {amount} алмазов. "
+            f"Теперь у него {new_balance} 💎",
+        )
+    

@@ -1,6 +1,10 @@
 # handlers/battleship_handlers.py
 
 from battleship import Game as SeaGame
+from db import get_balance, change_balance
+import random
+
+HINT_COST = 5
 
 sea_games = {}
 sea_players = {}
@@ -145,6 +149,77 @@ def register_handlers(bot):
         # Определяем следующего игрока
         next_player = "A" if game.turn == game.player_a_id else "B"
         bot.send_message(chat_id, f"Ход игрока {next_player}!")
+        
+    @bot.message_handler(commands=['seahint'])
+    def sea_hint_handler(message):
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+
+        # Проверяем, что есть активная игра
+        if chat_id not in sea_games:
+            bot.reply_to(message, "Нет активной игры. Создай /newsea.")
+            return
+
+        game = sea_games[chat_id]
+
+        # Проверяем, что пользователь в этой игре
+        if user_id not in [game.player_a_id, game.player_b_id]:
+            bot.reply_to(message, "Ты не в этой игре!")
+            return
+
+        # Пытаемся списать алмазы
+        try:
+            new_balance = change_balance(user_id, -HINT_COST)
+        except ValueError:
+            current = get_balance(user_id)
+            bot.reply_to(
+                message,
+                f"Не хватает алмазов. Нужно {HINT_COST}, у тебя {current} 💎."
+            )
+            return
+
+        # Определяем целевую доску (как в /shot — подсказка по противнику)
+        if user_id == game.player_a_id:
+            target_id = game.player_b_id
+        else:
+            target_id = game.player_a_id
+
+        target_board = game.boards[target_id]
+
+        # Собираем все клетки, куда ещё не стреляли: " " или "O"
+        candidates = []
+        for r in range(target_board.SIZE):
+            for c in range(target_board.SIZE):
+                ch = target_board.grid[r][c]
+                if ch in (" ", "O"):
+                    candidates.append((r, c))
+
+        if not candidates:
+            bot.reply_to(message, "Подсказок больше нет: всё поле уже прострелянo.")
+            return
+
+        # Выбираем случайную клетку и «стреляем» туда
+        r, c = random.choice(candidates)
+        result = target_board.receive_shot((r, c))
+
+        coord_text = f"{chr(ord('A') + r)}{c + 1}"
+
+        if result == "hit":
+            text = f"Подсказка: в клетке {coord_text} есть корабль! 🎯"
+        elif result == "sunk":
+            text = f"Подсказка: вы добили корабль в клетке {coord_text}! 💥"
+        else:
+            text = f"Подсказка: в клетке {coord_text} пусто. 💧"
+
+        bot.reply_to(
+            message,
+            f"{text}\nСписано {HINT_COST} алмазов, осталось {new_balance} 💎."
+        )
+
+        # Обновляем поля для обоих игроков
+        send_boards(bot, game)
+
+
 
 def send_boards(bot, game):
     """Отправляет доски обоим игрокам в личку"""
