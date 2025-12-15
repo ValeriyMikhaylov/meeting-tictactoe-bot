@@ -41,6 +41,7 @@ def register_handlers(bot):
         players.append(user.id)
         bot.reply_to(message, f"{user.first_name}, ты присоединился! 🎮")
         
+        # Если оба играют, начинаем игру
         if len(players) >= 2:
             player_a_id, player_b_id = players
             game = SeaGame(player_a_id, player_b_id)
@@ -49,16 +50,13 @@ def register_handlers(bot):
             sea_games[chat_id] = game
             
             # Отправляем доски каждому игроку в личку
-            board_a = game.boards[player_a_id]
-            board_b = game.boards[player_b_id]
-            
-            bot.send_message(player_a_id, f"Твоё поле (A):\n``````\n\nПоле противника (B):\n``````")
-            bot.send_message(player_b_id, f"Твоё поле (B):\n``````\n\nПоле противника (A):\n``````")
+            send_boards(bot, game)
             
             bot.send_message(chat_id, "Игра началась! 🚢\nИгрок A начинает. /shot A5")
 
     @bot.message_handler(commands=['shot'])
     def handle_shot(message):
+        """Обработка выстрелов в Морском бое"""
         chat_id = message.chat.id
         user_id = message.from_user.id
         
@@ -68,18 +66,22 @@ def register_handlers(bot):
         
         game = sea_games[chat_id]
         
+        # Проверяем, что пользователь в игре
         if user_id not in [game.player_a_id, game.player_b_id]:
             bot.reply_to(message, "Ты не в этой игре!")
             return
         
+        # Проверяем, чей ход
         if user_id != game.turn:
             bot.reply_to(message, "Сейчас не твой ход!")
             return
         
+        # Парсим координаты
         try:
             _, coord_text = message.text.split(maxsplit=1)
             coord_text = coord_text.strip().upper()
             
+            # Проверяем формат A5, B1, ..., J10
             if len(coord_text) < 2:
                 raise ValueError()
             
@@ -97,6 +99,7 @@ def register_handlers(bot):
             bot.reply_to(message, "Неверный формат. Используй /shot A5")
             return
         
+        # Определяем целевую доску
         if user_id == game.player_a_id:
             target_id = game.player_b_id
             target_board = game.boards[target_id]
@@ -104,8 +107,10 @@ def register_handlers(bot):
             target_id = game.player_a_id
             target_board = game.boards[target_id]
         
+        # Делаем выстрел
         result = target_board.receive_shot(row, col)
         
+        # Формируем ответ
         response = f"{coord_text}: "
         if result == 'miss':
             response += "Мимо! ❌"
@@ -116,21 +121,41 @@ def register_handlers(bot):
         
         bot.reply_to(message, response)
         
-        # Обновляем доски
-        board_a = game.boards[game.player_a_id]
-        board_b = game.boards[game.player_b_id]
-        
-        bot.send_message(game.player_a_id, f"Твоё поле (A):\n``````\n\nПоле противника (B):\n``````")
-        bot.send_message(game.player_b_id, f"Твоё поле (B):\n``````\n\nПоле противника (A):\n``````")
-        
+        # Проверяем, выиграл ли кто-то
         if target_board.all_ships_sunk():
             winner_name = "A" if user_id == game.player_a_id else "B"
             bot.send_message(chat_id, f"Игрок {winner_name} выиграл! 🏆")
             
+            # Удаляем игру
             sea_games.pop(chat_id, None)
             sea_players.pop(chat_id, None)
             return
         
+        # Иначе переходит ход
         game.switch_turn()
+        
+        # Отправляем обновлённые доски обоим игрокам
+        send_boards(bot, game)
+        
+        # Определяем следующего игрока
         next_player = "A" if game.turn == game.player_a_id else "B"
         bot.send_message(chat_id, f"Ход игрока {next_player}!")
+
+def send_boards(bot, game):
+    """Отправляет доски обоим игрокам в личку"""
+    board_a = game.boards[game.player_a_id]
+    board_b = game.boards[game.player_b_id]
+    
+    # Игроку A: его поле + поле противника B
+    bot.send_message(
+        game.player_a_id,
+        f"**Твоё поле (A):**\n``````\n\n"
+        f"**Поле противника (B):**\n``````"
+    )
+    
+    # Игроку B: его поле + поле противника A
+    bot.send_message(
+        game.player_b_id,
+        f"**Твоё поле (B):**\n``````\n\n"
+        f"**Поле противника (A):**\n``````"
+    )
