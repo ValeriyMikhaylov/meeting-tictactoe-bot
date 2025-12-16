@@ -78,25 +78,25 @@ def register_handlers(bot):
 
            
         def build_sea_field_keyboard(target_board: Board) -> InlineKeyboardMarkup:
-        kb = InlineKeyboardMarkup()
-        for r in range(target_board.SIZE):  # SIZE = 8
-            row_btns = []
-            for c in range(target_board.SIZE):
-                ch = target_board.grid[r][c]
-                if ch == target_board.HIT:
-                    text = "💥"
-                elif ch == target_board.MISS:
-                    text = "⚪"
-                else:
-                    text = "⬜"  # ещё не стреляли / скрытый корабль
-                row_btns.append(
-                    InlineKeyboardButton(
-                        text=text,
-                        callback_data=f"sea_cell_{r}_{c}",
+            kb = InlineKeyboardMarkup()
+            for r in range(target_board.SIZE):  # SIZE = 8
+                row_btns = []
+                for c in range(target_board.SIZE):
+                    ch = target_board.grid[r][c]
+                    if ch == target_board.HIT:
+                        text = "💥"
+                    elif ch == target_board.MISS:
+                        text = "⚪"
+                    else:
+                        text = "⬜"  # ещё не стреляли / скрытый корабль
+                    row_btns.append(
+                        InlineKeyboardButton(
+                            text=text,
+                            callback_data=f"sea_cell_{r}_{c}",
+                        )
                     )
-                )
-            kb.row(*row_btns)
-        return kb
+                kb.row(*row_btns)
+            return kb
 
 
 
