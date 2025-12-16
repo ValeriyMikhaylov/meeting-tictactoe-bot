@@ -17,7 +17,7 @@ class Ship:
 
 
 class Board:
-    SIZE = 10
+    SIZE = 8
     # Символы для внутреннего хранения
     EMPTY = " "
     SHIP = "O"
@@ -192,7 +192,7 @@ class Board:
 class Game:
     """Состояние матча между двумя игроками."""
 
-    FLEET_SCHEME = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]  # длины кораблей
+    FLEET_SCHEME = [3, 2, 2, 2, 1, 1]  # длины кораблей
 
     def __init__(self, player_a_id: int, player_b_id: int) -> None:
         self.player_a_id = player_a_id
