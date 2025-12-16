@@ -75,12 +75,15 @@ def register_handlers(bot):
             enemy_label = "Поле A (стреляешь сюда):\n"
             enemy_board = board_a.renderForOpponent()
 
-        # собираем строку без «висящих» бэктиков
-        text = title + enemy_label
-        text += "```"
-        text += enemy_board + "\n"
-        text += "```"
-        return text
+        # ВАЖНО: пустая строка перед `````` чтобы Telegram точно включил моноширинный шрифт
+        return (
+            title
+            + enemy_label
+            + "\n```
+            + enemy_board
+            + "\n```"
+        )
+
 
 
     @bot.message_handler(commands=['joinsea'])
