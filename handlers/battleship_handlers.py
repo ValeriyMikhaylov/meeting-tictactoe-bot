@@ -124,91 +124,91 @@ def register_handlers(bot):
         bot.answer_callback_query(call.id)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("sea_cell_") or call.data == "sea_back_rows")
-def handle_cell_or_back(call):
-    chat_id = call.message.chat.id
-    user_id = call.from_user.id
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("sea_cell_") or call.data == "sea_back_rows")
+    def handle_cell_or_back(call):
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
 
-    if chat_id not in sea_games:
-        bot.answer_callback_query(call.id, "Нет активной игры.")
-        return
+        if chat_id not in sea_games:
+            bot.answer_callback_query(call.id, "Нет активной игры.")
+            return
 
-    game = sea_games[chat_id]
+        game = sea_games[chat_id]
 
-    if call.data == "sea_back_rows":
-        # просто вернуться к выбору ряда
-        bot.edit_message_reply_markup(
-            chat_id=chat_id,
-            message_id=game.message_id,
-            reply_markup=build_row_keyboard()
-        )
-        bot.answer_callback_query(call.id)
-        return
+        if call.data == "sea_back_rows":
+            # просто вернуться к выбору ряда
+            bot.edit_message_reply_markup(
+                chat_id=chat_id,
+                message_id=game.message_id,
+                reply_markup=build_row_keyboard()
+            )
+            bot.answer_callback_query(call.id)
+            return
 
-    # sea_cell_A5
-    coord_text = call.data.split("_", 2)[2]  # "A5"
-    row_char = coord_text[0]
-    col_str = coord_text[1:]
+        # sea_cell_A5
+        coord_text = call.data.split("_", 2)[2]  # "A5"
+        row_char = coord_text[0]
+        col_str = coord_text[1:]
 
-    # Проверка, что пользователь в игре и его ход
-    if user_id not in [game.player_a_id, game.player_b_id]:
-        bot.answer_callback_query(call.id, "Ты не в этой игре!")
-        return
-    if user_id != game.turn:
-        bot.answer_callback_query(call.id, "Сейчас не твой ход!")
-        return
+        # Проверка, что пользователь в игре и его ход
+        if user_id not in [game.player_a_id, game.player_b_id]:
+            bot.answer_callback_query(call.id, "Ты не в этой игре!")
+            return
+        if user_id != game.turn:
+            bot.answer_callback_query(call.id, "Сейчас не твой ход!")
+            return
 
-    # Парсим координаты
-    try:
-        row = ord(row_char) - ord("A")
-        col = int(col_str) - 1
-        if not (0 <= row < 10 and 0 <= col < 10):
-            raise ValueError
-    except ValueError:
-        bot.answer_callback_query(call.id, "Неверная клетка.")
-        return
+        # Парсим координаты
+        try:
+            row = ord(row_char) - ord("A")
+            col = int(col_str) - 1
+            if not (0 <= row < 10 and 0 <= col < 10):
+                raise ValueError
+        except ValueError:
+            bot.answer_callback_query(call.id, "Неверная клетка.")
+            return
 
-    # Выбираем целевую доску, как в handle_shot
-    if user_id == game.player_a_id:
-        target_board = game.boards[game.player_b_id]
-    else:
-        target_board = game.boards[game.player_a_id]
+        # Выбираем целевую доску, как в handle_shot
+        if user_id == game.player_a_id:
+            target_board = game.boards[game.player_b_id]
+        else:
+            target_board = game.boards[game.player_a_id]
 
-    result = target_board.receive_shot((row, col))
+        result = target_board.receive_shot((row, col))
 
-    # Проверка победы
-    if target_board.all_ships_sunk():
-        winner_name = "A" if user_id == game.player_a_id else "B"
+        # Проверка победы
+        if target_board.all_ships_sunk():
+            winner_name = "A" if user_id == game.player_a_id else "B"
+            text = render_public_board(game)
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=game.message_id,
+                text=text,
+                reply_markup=None,
+            )
+            bot.answer_callback_query(call.id, f"Победа! Игрок {winner_name} выиграл! 🏆")
+            sea_games.pop(chat_id, None)
+            sea_players.pop(chat_id, None)
+            return
+
+        # Обновляем ход: при miss меняем игрока, при hit/sunk — оставляем
+        if result == "miss":
+            game.switch_turn()
+            info = "Мимо."
+        elif result == "hit":
+            info = "Попадание!"
+        else:  # sunk
+            info = "Корабль потоплен!"
+
+        # Обновляем текст и возвращаемся к выбору ряда
         text = render_public_board(game)
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=game.message_id,
             text=text,
-            reply_markup=None,
+            reply_markup=build_row_keyboard(),
         )
-        bot.answer_callback_query(call.id, f"Победа! Игрок {winner_name} выиграл! 🏆")
-        sea_games.pop(chat_id, None)
-        sea_players.pop(chat_id, None)
-        return
-
-    # Обновляем ход: при miss меняем игрока, при hit/sunk — оставляем
-    if result == "miss":
-        game.switch_turn()
-        info = "Мимо."
-    elif result == "hit":
-        info = "Попадание!"
-    else:  # sunk
-        info = "Корабль потоплен!"
-
-    # Обновляем текст и возвращаемся к выбору ряда
-    text = render_public_board(game)
-    bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=game.message_id,
-        text=text,
-        reply_markup=build_row_keyboard(),
-    )
-    bot.answer_callback_query(call.id, info)
+        bot.answer_callback_query(call.id, info)
 
 
         
@@ -286,30 +286,30 @@ def handle_cell_or_back(call):
         )
 
 
-        @bot.message_handler(commands=['seagiveup'])
-        def sea_giveup_handler(message):
-            chat_id = message.chat.id
-            user_id = message.from_user.id
+    @bot.message_handler(commands=['seagiveup'])
+    def sea_giveup_handler(message):
+        chat_id = message.chat.id
+        user_id = message.from_user.id
 
-            if chat_id not in sea_games:
-                bot.reply_to(message, "Нет активной игры. Создай /newsea.")
-                return
+        if chat_id not in sea_games:
+            bot.reply_to(message, "Нет активной игры. Создай /newsea.")
+            return
 
-            game = sea_games[chat_id]
+        game = sea_games[chat_id]
 
-            if user_id not in [game.player_a_id, game.player_b_id]:
-                bot.reply_to(message, "Ты не в этой игре!")
-                return
+        if user_id not in [game.player_a_id, game.player_b_id]:
+            bot.reply_to(message, "Ты не в этой игре!")
+            return
 
-            # Определяем, кто победил
-            winner_name = "A" if user_id != game.player_a_id else "B"
+        # Определяем, кто победил
+        winner_name = "A" if user_id != game.player_a_id else "B"
 
-            bot.send_message(
-                chat_id,
-                f"Игрок {'A' if user_id == game.player_a_id else 'B'} сдался. "
-                f"Победил игрок {winner_name}! 🏆"
-            )
+        bot.send_message(
+            chat_id,
+            f"Игрок {'A' if user_id == game.player_a_id else 'B'} сдался. "
+            f"Победил игрок {winner_name}! 🏆"
+        )
 
-            # Удаляем игру
-            sea_games.pop(chat_id, None)
-            sea_players.pop(chat_id, None)
+        # Удаляем игру
+        sea_games.pop(chat_id, None)
+        sea_players.pop(chat_id, None)
