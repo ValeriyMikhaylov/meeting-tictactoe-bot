@@ -1,6 +1,6 @@
 # handlers/battleship_handlers.py
 
-from battleship import Game as SeaGame
+from battleship import Game as SeaGame, Board
 from db import get_balance, change_balance
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import random
@@ -24,8 +24,8 @@ def build_cell_keyboard(game, target_board, row_char: str) -> InlineKeyboardMark
 
     for col in range(1, 11):
         ch = target_board.grid[row][col - 1]
-        # пропускаем, если сюда уже стреляли
-        if ch in ("X", "·"):
+        # пропускаем, если сюда уже стреляли (используем константы)
+        if ch in (target_board.HIT, target_board.MISS):
             continue
 
         buttons.append(
@@ -75,11 +75,14 @@ def register_handlers(bot):
             enemy_label = "Поле A (стреляешь сюда):\n"
             enemy_board = board_a.renderForOpponent()
 
-        # ВАЖНО: пустая строка перед `````` чтобы Telegram точно включил моноширинный шрифт
+        # Добавляем легенду для понимания символов
+        legend = "🌊 - вода/неизвестно | 💥 - попадание | ⚪ - промах\n\n"
+        
         return (
             title
+            + legend
             + enemy_label
-            + "\n```
+            + "\n```\n"
             + enemy_board
             + "\n```"
         )
@@ -278,16 +281,16 @@ def register_handlers(bot):
             target_id = game.player_a_id
         target_board = game.boards[target_id]
 
-        # Собираем кандидатов
+        # Собираем кандидатов (используем константы Board)
         candidates = []
         for r in range(target_board.SIZE):
             for c in range(target_board.SIZE):
                 ch = target_board.grid[r][c]
-                if ch in (" ", "O"):
+                if ch in (target_board.EMPTY, target_board.SHIP):
                     candidates.append((r, c))
 
         if not candidates:
-            bot.reply_to(message, "Подсказок больше нет: всё поле уже прострелянo.")
+            bot.reply_to(message, "Подсказок больше нет: всё поле уже простреляно.")
             return
 
         # Делаем выстрел

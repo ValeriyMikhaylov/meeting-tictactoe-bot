@@ -18,10 +18,22 @@ class Ship:
 
 class Board:
     SIZE = 10
+    # Символы для внутреннего хранения
+    EMPTY = " "
+    SHIP = "O"
+    HIT = "X"
+    MISS = "·"
+    
+    # Эмодзи для отображения
+    DISPLAY_SHIP = "🟦"    # синий квадрат - корабль
+    DISPLAY_HIT = "💥"     # взрыв - попадание
+    DISPLAY_MISS = "⚪"     # белый круг - промах
+    DISPLAY_WATER = "🌊"    # волны - вода/скрытая клетка
+    DISPLAY_HIDDEN_SHIP = "🌊"  # скрытый корабль тоже как вода
 
     def __init__(self) -> None:
-        # " " — неизвестно, "O" — корабль, "X" — попадание, "·" — мимо
-        self.grid: List[List[str]] = [[" " for _ in range(self.SIZE)] for _ in range(self.SIZE)]
+        # Используем внутренние символы для хранения
+        self.grid: List[List[str]] = [[self.EMPTY for _ in range(self.SIZE)] for _ in range(self.SIZE)]
         self.ships: List[Ship] = []
 
     def in_bounds(self, r: int, c: int) -> bool:
@@ -45,7 +57,7 @@ class Board:
                     if not self.in_bounds(nr, nc):
                         continue
                     # если где-то рядом уже стоит корабль — нельзя
-                    if self.grid[nr][nc] == "O":
+                    if self.grid[nr][nc] == self.SHIP:
                         return False
 
         return True    
@@ -60,46 +72,42 @@ class Board:
         cells: List[Coord] = []
         for i in range(length):
             r, c = bow[0] + dr * i, bow[1] + dc * i
-            self.grid[r][c] = "O"
+            self.grid[r][c] = self.SHIP
             cells.append((r, c))
 
         self.ships.append(Ship(cells=cells))
         return True
 
     def receive_shot(self, coord: Coord) -> str:
-        """
-        Обрабатывает выстрел.
-        Возвращает: "miss", "hit", "sunk".
-        """
         r, c = coord
         if not self.in_bounds(r, c):
             return "miss"
 
         # уже стреляли сюда
-        if self.grid[r][c] in ("X", "·"):
+        if self.grid[r][c] in (self.HIT, self.MISS):
             return "miss"
 
-        if self.grid[r][c] == "O":
+        if self.grid[r][c] == self.SHIP:
             # попали в корабль
-            self.grid[r][c] = "X"
+            self.grid[r][c] = self.HIT
             for ship in self.ships:
                 if coord in ship.cells:
                     ship.hits.add(coord)
                     if ship.is_sunk():
-                        # корабль утонул — обводим его точками
+                        # корабль утонул — обводим его точками (промахами)
                         for sr, sc in ship.cells:
                             for nr in range(sr - 1, sr + 2):
                                 for nc in range(sc - 1, sc + 2):
                                     if not self.in_bounds(nr, nc):
                                         continue
-                                    if self.grid[nr][nc] == " ":
-                                        self.grid[nr][nc] = "·"
+                                    if self.grid[nr][nc] == self.EMPTY:
+                                        self.grid[nr][nc] = self.MISS
                         return "sunk"
                     else:
                         return "hit"
         else:
             # мимо по пустой клетке
-            self.grid[r][c] = "·"
+            self.grid[r][c] = self.MISS
             return "miss"
 
         return "miss"
@@ -111,52 +119,70 @@ class Board:
     def renderForOwner(self) -> str:
         """Показывает доску владельцу - видны корабли и выстрелы"""
         lines = []
-
-        # Шапка: числа 1–10 с отступом под букву
-        header = "  " + " ".join(str(c) for c in range(1, self.SIZE + 1))
+        
+        # Шапка с выравниванием для двузначных чисел
+        header = "   " + " ".join(f"{c+1:2}" for c in range(self.SIZE))
         lines.append(header)
-
+        
         for r in range(self.SIZE):
             row_cells = []
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
-                if ch == "O":
-                    ch = "O"   # корабль
-                elif ch == "X":
-                    ch = "X"   # попадание
-                elif ch == "·" or ch == ".":
-                    ch = "~"   # промах
+                if ch == self.SHIP:
+                    row_cells.append(self.DISPLAY_SHIP)      # корабль
+                elif ch == self.HIT:
+                    row_cells.append(self.DISPLAY_HIT)       # попадание
+                elif ch == self.MISS:
+                    row_cells.append(self.DISPLAY_MISS)      # промах
                 else:
-                    ch = "."   # пусто
-                row_cells.append(ch)
-
-            # Буква строки + пробел + клетки
-            lines.append(f"{chr(ord('A') + r)} " + " ".join(row_cells))
-
+                    row_cells.append(self.DISPLAY_WATER)     # вода
+            lines.append(f"{chr(ord('A') + r)}  " + " ".join(row_cells))
+        
         return "\n".join(lines)
-   
+
 
     def renderForOpponent(self) -> str:
-        """Показывает доску сопернику - скрывает корабли"""
+        """Показывает доску сопернику - чистый ASCII"""
         lines = []
-
-        header = "  " + " ".join(str(c) for c in range(1, self.SIZE + 1))
+        
+        # Верхняя граница
+        lines.append("┌───" + "┬───" * self.SIZE + "┐")
+        
+        # Цифры колонок (в своих ячейках)
+        header = "│   │"
+        for c in range(self.SIZE):
+            num = c + 1
+            if num < 10:
+                header += f" {num} │"
+            else:
+                header += f"{num} │"
         lines.append(header)
-
+        
+        # Разделитель под шапкой
+        lines.append("├───" + "┼───" * self.SIZE + "┤")
+        
+        # Строки с буквами
         for r in range(self.SIZE):
-            row_cells = []
+            row = f"│ {chr(ord('A') + r)} │"
+            
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
-                if ch == "X":
-                    ch = "X"
-                elif ch == "·" or ch == ".":
-                    ch = "~"
+                if ch == self.HIT:
+                    row += " X │"
+                elif ch == self.MISS:
+                    row += " · │"
                 else:
-                    ch = "."
-                row_cells.append(ch)
-
-            lines.append(f"{chr(ord('A') + r)} " + " ".join(row_cells))
-
+                    row += " ~ │"
+            
+            lines.append(row)
+            
+            # Разделитель между строками
+            if r < self.SIZE - 1:
+                lines.append("├───" + "┼───" * self.SIZE + "┤")
+        
+        # Нижняя граница
+        lines.append("└───" + "┴───" * self.SIZE + "┘")
+        
         return "\n".join(lines)
 
 
