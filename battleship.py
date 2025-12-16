@@ -121,13 +121,13 @@ class Board:
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
                 if ch == "O":
-                    ch = "🛢"  # корабль
+                    ch = "O"   # корабль
                 elif ch == "X":
-                    ch = "❌"  # попадание
-                elif ch == "·" or ch == ".":  # промах (учитываем оба варианта)
-                    ch = "💧"
+                    ch = "X"   # попадание
+                elif ch == "·" or ch == ".":
+                    ch = "~"   # промах
                 else:
-                    ch = "⬜"  # пусто
+                    ch = "."   # пусто
                 row_cells.append(ch)
 
             # Буква строки + пробел + клетки
@@ -148,11 +148,11 @@ class Board:
             for c in range(self.SIZE):
                 ch = self.grid[r][c]
                 if ch == "X":
-                    ch = "❌"
+                    ch = "X"
                 elif ch == "·" or ch == ".":
-                    ch = "💧"
+                    ch = "~"
                 else:
-                    ch = "⬜"
+                    ch = "."
                 row_cells.append(ch)
 
             lines.append(f"{chr(ord('A') + r)} " + " ".join(row_cells))

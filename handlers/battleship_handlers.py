@@ -17,24 +17,33 @@ def build_row_keyboard() -> InlineKeyboardMarkup:
     kb.row(*buttons)
     return kb
 
-def build_cell_keyboard(row_char: str) -> InlineKeyboardMarkup:
+def build_cell_keyboard(game, target_board, row_char: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup()
     buttons = []
+    row = ord(row_char) - ord("A")
+
     for col in range(1, 11):
+        ch = target_board.grid[row][col - 1]
+        # пропускаем, если сюда уже стреляли
+        if ch in ("X", "·"):
+            continue
+
         buttons.append(
             InlineKeyboardButton(
                 text=str(col),
-                callback_data=f"sea_cell_{row_char}{col}"
+                callback_data=f"sea_cell_{row_char}{col}",
             )
         )
-        if col % 5 == 0:
+        if len(buttons) == 5:
             kb.row(*buttons)
             buttons = []
+
     if buttons:
         kb.row(*buttons)
-    # Добавим кнопку «назад» к выбору ряда
+
     kb.row(InlineKeyboardButton(text="⬅️ Ряд", callback_data="sea_back_rows"))
     return kb
+
 
 
 def register_handlers(bot):
@@ -55,13 +64,18 @@ def register_handlers(bot):
     def render_public_board(game) -> str:
         board_a = game.boards[game.player_a_id]
         board_b = game.boards[game.player_b_id]
-        current = "A" if game.turn == game.player_a_id else "B"
-        return (
-            f"Морской бой. Ход игрока {current}\n\n"
-            f"Поле A:\n{board_a.renderForOwner()}\n\n"
-            f"Поле B:\n{board_b.renderForOwner()}\n"
-        )
+        current_is_a = (game.turn == game.player_a_id)
 
+        if current_is_a:
+            title = "Морской бой. Ход игрока A\n\n"
+            enemy_label = "Поле B (стреляешь сюда):\n"
+            enemy_board = board_b.renderForOpponent()
+        else:
+            title = "Морской бой. Ход игрока B\n\n"
+            enemy_label = "Поле A (стреляешь сюда):\n"
+            enemy_board = board_a.renderForOpponent()
+
+        return title + enemy_label + "``````"
 
     @bot.message_handler(commands=['joinsea'])
     def join_sea_game_message(message):
@@ -111,17 +125,25 @@ def register_handlers(bot):
             return
 
         game = sea_games[chat_id]
+
         if user_id not in [game.player_a_id, game.player_b_id]:
             bot.answer_callback_query(call.id, "Ты не в этой игре!")
             return
 
-        # показываем клавиатуру выбора столбца для этого ряда
+        # определяем доску, по которой стреляем
+        if user_id == game.player_a_id:
+            target_board = game.boards[game.player_b_id]
+        else:
+            target_board = game.boards[game.player_a_id]
+
+        # показываем клавиатуру выбора столбца только по ещё не прострелянным клеткам
         bot.edit_message_reply_markup(
             chat_id=chat_id,
             message_id=game.message_id,
-            reply_markup=build_cell_keyboard(row_char)
+            reply_markup=build_cell_keyboard(game, target_board, row_char),
         )
         bot.answer_callback_query(call.id)
+
 
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("sea_cell_") or call.data == "sea_back_rows")
