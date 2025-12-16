@@ -75,7 +75,13 @@ def register_handlers(bot):
             enemy_label = "Поле A (стреляешь сюда):\n"
             enemy_board = board_a.renderForOpponent()
 
-        return title + enemy_label + "``````"
+        # собираем строку без «висящих» бэктиков
+        text = title + enemy_label
+        text += "```"
+        text += enemy_board + "\n"
+        text += "```"
+        return text
+
 
     @bot.message_handler(commands=['joinsea'])
     def join_sea_game_message(message):
