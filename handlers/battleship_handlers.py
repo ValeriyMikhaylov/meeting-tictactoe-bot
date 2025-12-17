@@ -4,6 +4,7 @@ from battleship import Game as SeaGame, Board
 from db import get_balance, change_balance
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import random
+import time
 
 HINT_COST = 5
 
@@ -11,8 +12,13 @@ sea_games = {}
 sea_players = {}
 
 
-def build_sea_field_keyboard(target_board: Board) -> InlineKeyboardMarkup:
-    """Создает клавиатуру для поля морского боя"""
+def build_sea_field_keyboard(target_board: Board, is_player_a_turn: bool) -> InlineKeyboardMarkup:
+    """Создает клавиатуру для поля морского боя
+    
+    Args:
+        target_board: Доска противника
+        is_player_a_turn: True, если сейчас ход игрока A
+    """
     kb = InlineKeyboardMarkup()
     for r in range(target_board.SIZE):
         row_btns = []
@@ -25,7 +31,8 @@ def build_sea_field_keyboard(target_board: Board) -> InlineKeyboardMarkup:
             elif ch == target_board.MISS:
                 text = "⚪"
             else:
-                text = "🟦"  # ⬜ заменить на 🟦 - синий квадрат  # скрытый корабль или пустая клетка
+                # Разные цвета для разных игроков
+                text = "🟦" if is_player_a_turn else "⬜"  # A - синий, B - серый
             
             # Определяем callback_data
             if ch in (target_board.HIT, target_board.MISS):
@@ -45,15 +52,19 @@ def build_sea_field_keyboard(target_board: Board) -> InlineKeyboardMarkup:
 
 
 def render_game_info(game) -> str:
-    """Рендерит текстовую информацию о текущему состоянию игры"""
+    """Рендерит текстовую информацию о текущем состоянии игры"""
     current_is_a = game.turn == game.player_a_id
     
     if current_is_a:
         title = "🎯 Морской бой. Ход игрока A\n\n"
+        # Для игрока A: неизвестное поле синее
+        unknown_color = "🟦"
     else:
         title = "🎯 Морской бой. Ход игрока B\n\n"
+        # Для игрока B: неизвестное поле серое
+        unknown_color = "⬜"
     
-    legend = f"🟦 неизвестно | 💥 попадание | ⚪ промах\n" \
+    legend = f"{unknown_color} неизвестно | 💥 попадание | ⚪ промах\n" \
              f"Чит-выстрел: /seahint ({HINT_COST}💎)\n" \
              f"/seagiveup - сдаться и завершить игру\n\n"
     
@@ -69,21 +80,64 @@ def get_target_board_and_player(game, user_id):
 
 
 def update_game_board(bot, game):
-    """Обновляет игровое поле в чате"""
+    """Обновляет игровое поле в чате с защитой от слишком частых запросов"""
     current_player_id = game.turn
     target_board, _ = get_target_board_and_player(game, current_player_id)
     text = render_game_info(game)
     
+    # Определяем, чей сейчас ход для выбора цвета
+    is_player_a_turn = (game.turn == game.player_a_id)
+    
     try:
+        # Добавляем небольшую задержку, чтобы избежать ошибки 429
+        time.sleep(0.1)
+        
         if hasattr(game, 'message_id') and game.message_id:
             bot.edit_message_text(
                 chat_id=game.chat_id,
                 message_id=game.message_id,
                 text=text,
-                reply_markup=build_sea_field_keyboard(target_board)
+                reply_markup=build_sea_field_keyboard(target_board, is_player_a_turn)
             )
     except Exception as e:
         print(f"Ошибка при обновлении поля: {e}")
+
+
+def declare_winner(bot, chat_id, user_id, game):
+    """Объявляет победителя и завершает игру"""
+    winner_name = "A" if user_id == game.player_a_id else "B"
+    
+    # Показываем последний ход с цветом победителя
+    target_board, _ = get_target_board_and_player(game, user_id)
+    text = render_game_info(game)
+    
+    # Для последнего отображения используем цвет победителя
+    is_player_a_winner = (winner_name == "A")
+    
+    try:
+        time.sleep(0.1)
+        if hasattr(game, 'message_id') and game.message_id:
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=game.message_id,
+                text=text,
+                reply_markup=build_sea_field_keyboard(target_board, is_player_a_winner)
+            )
+    except Exception as e:
+        print(f"Ошибка при показе последнего хода: {e}")
+    
+    # Затем объявляем победителя
+    time.sleep(0.2)
+    bot.send_message(
+        chat_id,
+        f"🎉🎉🎉 ПОБЕДА! 🎉🎉🎉\n"
+        f"Игрок {winner_name} выиграл! 🏆\n"
+        f"Все корабли противника потоплены!"
+    )
+    
+    # Очищаем игру
+    sea_games.pop(chat_id, None)
+    sea_players.pop(chat_id, None)
 
 
 def register_handlers(bot):
@@ -100,7 +154,7 @@ def register_handlers(bot):
             message,
             "🚢 Морской бой создан!\n"
             "/joinsea - присоединиться (первый A, второй B)\n"
-            "Для выстрела нажимай на поле.",
+            "Выстрелы делаются через кнопки под полем.",
         )
 
     @bot.message_handler(commands=["joinsea"])
@@ -137,8 +191,12 @@ def register_handlers(bot):
             # Создаем игровое поле в чате (первый ход делает A)
             target_board = game.boards[player_b_id]
             text = render_game_info(game)
+            
+            # Первый ход делает A, поэтому синие клетки
             msg = bot.send_message(
-                chat_id, text, reply_markup=build_sea_field_keyboard(target_board)
+                chat_id, 
+                text, 
+                reply_markup=build_sea_field_keyboard(target_board, is_player_a_turn=True)
             )
             game.message_id = msg.message_id
 
@@ -170,7 +228,7 @@ def register_handlers(bot):
         r, c = int(r_str), int(c_str)
 
         # Получаем доску противника
-        target_board, _ = get_target_board_and_player(game, user_id)
+        target_board, target_player_id = get_target_board_and_player(game, user_id)
 
         # Проверяем, не стреляли ли уже в эту клетку
         if target_board.grid[r][c] in (target_board.HIT, target_board.MISS):
@@ -179,32 +237,21 @@ def register_handlers(bot):
 
         # Делаем выстрел
         result = target_board.receive_shot((r, c))
-
-        # Проверка победы
+        
+        # Немедленно проверяем победу ДО обработки других действий
         if target_board.all_ships_sunk():
-            winner_name = "A" if user_id == game.player_a_id else "B"
-            
-            # Обновляем поле с последним выстрелом
-            text = render_game_info(game)
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=game.message_id,
-                text=text,
-                reply_markup=build_sea_field_keyboard(target_board)
-            )
-            
-            # Отправляем сообщение о победе
-            bot.send_message(
-                chat_id,
-                f"🎉 Победа! Игрок {winner_name} выиграл! 🏆"
-            )
-            
-            # Очищаем игру
-            sea_games.pop(chat_id, None)
-            sea_players.pop(chat_id, None)
+            try:
+                bot.answer_callback_query(call.id, "ПОБЕДА! Все корабли противника потоплены! 🏆")
+                declare_winner(bot, chat_id, user_id, game)
+            except Exception as e:
+                print(f"Ошибка при объявлении победителя: {e}")
+                # Все равно очищаем игру при ошибке
+                sea_games.pop(chat_id, None)
+                sea_players.pop(chat_id, None)
+                bot.send_message(chat_id, f"🎉 Игрок {'A' if user_id == game.player_a_id else 'B'} выиграл! 🏆")
             return
 
-        # Обрабатываем результат выстрела
+        # Обрабатываем результат выстрела (если игра еще не окончена)
         if result == "miss":
             info = "Мимо. Ход переходит к противнику."
             bot.answer_callback_query(call.id, info)
@@ -268,7 +315,7 @@ def register_handlers(bot):
             return
 
         # Определяем целевую доску (подсказка по противнику)
-        target_board, _ = get_target_board_and_player(game, user_id)
+        target_board, target_player_id = get_target_board_and_player(game, user_id)
 
         # Собираем кандидатов (клетки, куда еще не стреляли)
         candidates = []
@@ -301,13 +348,7 @@ def register_handlers(bot):
 
         # Проверяем победу после подсказки
         if target_board.all_ships_sunk():
-            winner_name = "A" if user_id == game.player_a_id else "B"
-            bot.send_message(
-                chat_id,
-                f"🎉 Победа! Игрок {winner_name} выиграл! 🏆"
-            )
-            sea_games.pop(chat_id, None)
-            sea_players.pop(chat_id, None)
+            declare_winner(bot, chat_id, user_id, game)
             return
 
         # Обновляем игровое поле в чате
