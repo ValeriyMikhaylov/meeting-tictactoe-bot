@@ -30,6 +30,15 @@ tictactoe_handlers.register_handlers(bot)
 battleship_handlers.register_handlers(bot)
 common_handlers.register_handlers(bot)
 
+# Импорт и регистрация сапера (если файл существует)
+try:
+    from handlers.minesweeper_handlers import register_handlers as register_minesweeper_handlers
+    register_minesweeper_handlers(bot)
+    print(">>> Minesweeper handlers registered successfully")
+except ImportError as e:
+    print(f">>> Minesweeper not available: {e}")
+    print(">>> To add minesweeper, create handlers/minesweeper_handlers.py")
+
 def main():
     logger.info("Bot starting...")
     print(">>> Bot started")

@@ -145,16 +145,21 @@ def register_handlers(bot):
     @bot.message_handler(commands=["newsea"])
     def new_sea_game_message(message):
         chat_id = message.chat.id
+        user = message.from_user
+        
         if chat_id in sea_games:
-            bot.reply_to(message, "Игра уже создана!")
+            bot.reply_to(message, "В этом чате уже есть активная игра!")
             return
 
-        sea_players[chat_id] = []
+        # Создаем список игроков и сразу добавляем создателя как игрока A
+        sea_players[chat_id] = [user.id]
+        
         bot.reply_to(
             message,
-            "🚢 Морской бой создан!\n"
-            "/joinsea - присоединиться (первый A, второй B)\n"
-            "Выстрелы делаются через кнопки под полем.",
+            f"🚢 Морской бой создан!\n"
+            f"{user.first_name}, ты играешь за A (синие клетки).\n"
+            f"/joinsea - присоединиться вторым игроком (будет B, серые клетки)\n"
+            f"Выстрелы делаются через кнопки под полем."
         )
 
     @bot.message_handler(commands=["joinsea"])
@@ -167,18 +172,21 @@ def register_handlers(bot):
             return
 
         players = sea_players[chat_id]
+        
+        # Проверяем, не пытается ли присоединиться создатель
         if user.id in players:
-            bot.reply_to(message, "Ты уже в игре.")
+            bot.reply_to(message, "Ты уже в игре!")
             return
 
         if len(players) >= 2:
             bot.reply_to(message, "Уже двое в игре!")
             return
 
+        # Добавляем второго игрока
         players.append(user.id)
-        bot.reply_to(message, f"{user.first_name}, ты присоединился! 🎮")
+        bot.reply_to(message, f"{user.first_name}, ты присоединился как игрок B! 🎮")
 
-        # Если оба играют, начинаем игру
+        # Если оба игрока на месте, начинаем игру
         if len(players) >= 2:
             player_a_id, player_b_id = players
             game = SeaGame(player_a_id, player_b_id)

@@ -43,14 +43,27 @@ def register_handlers(bot):
     @bot.message_handler(commands=['newgame'])
     def new_game_message(message):
         chat_id = message.chat.id
+        user = message.from_user
+        
+        # Проверяем, нет ли уже активной игры
+        if chat_id in games:
+            bot.reply_to(message, "В этом чате уже есть активная игра!")
+            return
+        
+        # Создаем игру и сразу добавляем создателя как первого игрока (X)
         games[chat_id] = {
             'board': empty_board(),
-            'players': {},
+            'players': {user.id: 'X'},  # Создатель сразу становится игроком X
             'turn': 'X',
             'message_id': None,
         }
-        bot.reply_to(message, "Игра создана! ✅\n"
-                              "/join - присоединиться (первый X, второй O)\n")
+        
+        bot.reply_to(
+            message,
+            f"🎮 Игра создана! {user.first_name}, ты играешь за X.\n"
+            f"Ждем второго игрока: /join - присоединиться (будет O)\n\n"
+            f"Игра начнется, когда присоединится второй игрок."
+        )
 
     @bot.message_handler(commands=['join'])
     def join_message(message):
@@ -64,18 +77,21 @@ def register_handlers(bot):
         game = games[chat_id]
         players = game['players']
         
+        # Проверяем, не пытается ли присоединиться создатель игры
         if user.id in players:
-            bot.reply_to(message, f"Ты уже играешь за {players[user.id]}.")
+            bot.reply_to(message, f"Ты уже в игре за {players[user.id]}!")
             return
         
+        # Проверяем, есть ли место для второго игрока
         if len(players) >= 2:
-            bot.reply_to(message, "Уже двое в игре!")
+            bot.reply_to(message, "В игре уже двое игроков!")
             return
         
-        symbol = 'X' if 'X' not in players.values() else 'O'
-        players[user.id] = symbol
-        bot.reply_to(message, f"{user.first_name}, ты играешь за {symbol}.")
+        # Добавляем второго игрока как O
+        players[user.id] = 'O'
+        bot.reply_to(message, f"{user.first_name}, ты играешь за O. ✅")
         
+        # Когда оба игрока на месте - начинаем игру
         if len(players) >= 2:
             text = "Игра началась! ✅\n"
             text += f"Ходит '{game['turn']}'.\n\n"
