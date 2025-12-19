@@ -18,10 +18,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 print(">>> bot script import OK")
 
+# Загрузка конфигурации из переменных окружения
 TOKEN = os.environ.get("TOKEN")
+ADMIN_ID = os.environ.get("ADMIN_ID")
+
 if not TOKEN:
     print("ERROR: TOKEN not found in environment variables!")
     exit(1)
+
+if not ADMIN_ID:
+    print("WARNING: ADMIN_ID not found in environment variables! Admin commands will be disabled.")
+    print("Set ADMIN_ID in environment variables to enable admin commands.")
+else:
+    print(f">>> Admin ID loaded: {ADMIN_ID}")
 
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
