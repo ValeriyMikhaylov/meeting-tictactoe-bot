@@ -20,6 +20,8 @@ def build_sea_field_keyboard(target_board: Board, is_player_a_turn: bool) -> Inl
         is_player_a_turn: True, если сейчас ход игрока A
     """
     kb = InlineKeyboardMarkup()
+    
+    # Поле 8x8
     for r in range(target_board.SIZE):
         row_btns = []
         for c in range(target_board.SIZE):
@@ -29,7 +31,7 @@ def build_sea_field_keyboard(target_board: Board, is_player_a_turn: bool) -> Inl
             if ch == target_board.HIT:
                 text = "💥"
             elif ch == target_board.MISS:
-                text = "⚪"
+                text = "⚫"  # Черный круг вместо белого
             else:
                 # Разные цвета для разных игроков
                 text = "🟦" if is_player_a_turn else "⬜"  # A - синий, B - серый
@@ -48,6 +50,23 @@ def build_sea_field_keyboard(target_board: Board, is_player_a_turn: bool) -> Inl
                 )
             )
         kb.row(*row_btns)
+    
+    # ДОБАВЛЯЕМ КНОПКИ ВНИЗУ (аналогично саперу)
+    action_row = []
+    action_row.append(
+        InlineKeyboardButton(
+            text=f"Чит-выстрел 5💎", 
+            callback_data="sea_hint_button"
+        )
+    )
+    action_row.append(
+        InlineKeyboardButton(
+            text="Сдаться", 
+            callback_data="sea_giveup_button"
+        )
+    )
+    kb.row(*action_row)
+    
     return kb
 
 
@@ -64,9 +83,8 @@ def render_game_info(game) -> str:
         # Для игрока B: неизвестное поле серое
         unknown_color = "⬜"
     
-    legend = f"{unknown_color} неизвестно | 💥 попадание | ⚪ промах\n" \
-             f"Чит-выстрел: /seahint ({HINT_COST}💎)\n" \
-             f"/seagiveup - сдаться и завершить игру\n\n"
+    # УБИРАЕМ ИНФОРМАЦИЮ О ЧИТАХ И СДАЧЕ - теперь это кнопки
+    legend = f"{unknown_color} неизвестно | 💥 попадание | ⚫ промах\n\n"
     
     return title + legend
 
@@ -284,6 +302,115 @@ def register_handlers(bot):
             # Обновляем поле (текущий игрок продолжает ход)
             update_game_board(bot, game)
 
+    @bot.callback_query_handler(func=lambda call: call.data == "sea_hint_button")
+    def handle_hint_button(call):
+        """Обрабатывает нажатие кнопки 'Чит-выстрел'"""
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
+
+        if chat_id not in sea_games:
+            bot.answer_callback_query(call.id, "Нет активной игры.")
+            return
+
+        game = sea_games[chat_id]
+
+        # Проверяем, что пользователь в этой игре
+        if user_id not in [game.player_a_id, game.player_b_id]:
+            bot.answer_callback_query(call.id, "Ты не в этой игре!")
+            return
+
+        # Проверяем, что сейчас ход пользователя
+        if user_id != game.turn:
+            bot.answer_callback_query(call.id, "Подсказку можно использовать только во время своего хода!")
+            return
+
+        # Пытаемся списать алмазы
+        try:
+            new_balance = change_balance(user_id, -HINT_COST)
+        except ValueError:
+            current = get_balance(user_id)
+            bot.answer_callback_query(
+                call.id, 
+                f"Не хватает алмазов. Нужно {HINT_COST}, у тебя {current} 💎.\n"
+                f"Пополнить баланс через перевод на +7 977 4646109, один рубль = 1 алмаз",
+                show_alert=True
+            )
+            return
+
+        # Определяем целевую доску (подсказка по противнику)
+        target_board, target_player_id = get_target_board_and_player(game, user_id)
+
+        # Собираем кандидатов (клетки, куда еще не стреляли)
+        candidates = []
+        for r in range(target_board.SIZE):
+            for c in range(target_board.SIZE):
+                ch = target_board.grid[r][c]
+                if ch not in (target_board.HIT, target_board.MISS):
+                    candidates.append((r, c))
+
+        if not candidates:
+            bot.answer_callback_query(call.id, "Подсказок больше нет: всё поле уже простреляно.")
+            return
+
+        # Выбираем случайную клетку и делаем выстрел
+        r, c = random.choice(candidates)
+        result = target_board.receive_shot((r, c))
+        coord_text = f"{chr(ord('A') + r)}{c + 1}"
+
+        if result == "hit":
+            text = f"Подсказка: в клетке {coord_text} есть корабль! 🎯"
+        elif result == "sunk":
+            text = f"Подсказка: вы добили корабль в клетке {coord_text}! 💥"
+        else:
+            text = f"Подсказка: в клетке {coord_text} пусто. 💧"
+
+        bot.answer_callback_query(call.id, f"{text}\nСписано {HINT_COST} алмазов, осталось {new_balance} 💎.")
+
+        # Проверяем победу после подсказки
+        if target_board.all_ships_sunk():
+            declare_winner(bot, chat_id, user_id, game)
+            return
+
+        # Обновляем игровое поле в чате
+        update_game_board(bot, game)
+
+        # Если промах в подсказке - переключаем ход
+        if result == "miss":
+            game.switch_turn()
+            update_game_board(bot, game)
+
+    @bot.callback_query_handler(func=lambda call: call.data == "sea_giveup_button")
+    def handle_giveup_button(call):
+        """Обрабатывает нажатие кнопки 'Сдаться'"""
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
+
+        if chat_id not in sea_games:
+            bot.answer_callback_query(call.id, "Нет активной игры.")
+            return
+
+        game = sea_games[chat_id]
+
+        if user_id not in [game.player_a_id, game.player_b_id]:
+            bot.answer_callback_query(call.id, "Ты не в этой игре!")
+            return
+
+        # Определяем, кто победил
+        winner_name = "A" if user_id != game.player_a_id else "B"
+        loser_name = "A" if user_id == game.player_a_id else "B"
+
+        bot.answer_callback_query(call.id, f"Игрок {loser_name} сдался. Победил игрок {winner_name}! 🏆")
+        
+        # Отправляем сообщение в чат
+        bot.send_message(
+            chat_id,
+            f"🏳️ Игрок {loser_name} сдался. Победил игрок {winner_name}! 🏆",
+        )
+
+        # Удаляем игру
+        sea_games.pop(chat_id, None)
+        sea_players.pop(chat_id, None)
+
     @bot.callback_query_handler(func=lambda call: call.data == "sea_ignore")
     def handle_sea_ignore(call):
         """Обрабатывает нажатие на уже прострелянную клетку"""
@@ -318,7 +445,11 @@ def register_handlers(bot):
             current = get_balance(user_id)
             bot.reply_to(
                 message,
-                f"Не хватает алмазов. Нужно {HINT_COST}, у тебя {current} 💎.",
+                f"Не хватает алмазов. Нужно {HINT_COST}, у тебя {current} 💎.\n\n"
+                f"💳 Пополнить баланс:\n"
+                f"Перевод на +7 977 4646109\n"
+                f"1 рубль = 1 алмаз 💎\n"
+                f"В комментарии укажите ваш ID: {user_id}",
             )
             return
 

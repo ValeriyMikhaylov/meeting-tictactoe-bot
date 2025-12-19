@@ -30,7 +30,14 @@ def change_balance(user_id: int, delta: int) -> int:
     balance = get_balance(user_id)
     new_balance = balance + delta
     if new_balance < 0:
-        raise ValueError("Not enough diamonds")
+        error_msg = (
+            f"Не хватает алмазов. Нужно {-delta}, у тебя {balance} 💎.\n\n"
+            f"💳 **Пополнить баланс:**\n"
+            f"Перевод на +7 977 4646109\n"
+            f"1 рубль = 1 алмаз 💎\n"
+            f"В комментарии укажите ваш ID: {user_id}"
+        )
+        raise ValueError(error_msg)
 
     cur.execute(
         "UPDATE users SET diamonds = ? WHERE user_id = ?",
